@@ -2,16 +2,22 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>英単語タイピング 改良版</title>
+<title>英単語タイピング 完全改良版</title>
 <style>
-body{ text-align:center; font-family:sans-serif; margin:0; background:#f0f8ff;}
-h1{ font-size:50px; margin:20px;}
-#word{ font-size:60px; margin:20px; color:#007acc;}
-input{ font-size:28px; padding:10px; width:80%; max-width:400px; text-align:center;}
-button{ font-size:22px; padding:10px 20px; margin:10px; border-radius:10px;}
-#gameArea,#resultArea{ display:none;}
-.stat{ font-size:22px; margin:5px;}
-#countdown{ font-size:60px; color:red; }
+body{ text-align:center; font-family:sans-serif; margin:0; padding:0; background-color:#f0f8ff;}
+h1{ font-size:60px; color:#333; margin-top:20px;}
+#word{ font-size:70px; margin:30px; color:#007acc; transition: all 0.2s;}
+input, select, button{ font-size:28px; padding:12px; text-align:center; margin:10px; border-radius:8px;}
+button{ cursor:pointer;}
+#score, #timer, #combo, #level{ font-size:40px; margin:15px;}
+#combo{ color:#d2691e; }
+#level{ color:#228b22; }
+.correctEffect{ color:#32cd32; transform: scale(1.2);}
+.wrongEffect{ color:#ff4500; transform: scale(1.2);}
+#gameArea, #reviewArea{ display:none; width:100%; max-width:900px; margin:auto;}
+#shareBtns button{ margin:5px; font-size:22px; padding:8px 15px;}
+#description{ font-size:24px; color:#555; margin:10px;}
+#countdown{ font-size:80px; color:red; }
 </style>
 </head>
 <body>
@@ -19,38 +25,80 @@ button{ font-size:22px; padding:10px 20px; margin:10px; border-radius:10px;}
 <h1>英単語タイピング</h1>
 
 <div id="setupArea">
-  <button onclick="prepareGame()">スタート準備</button>
+  <div>
+    <label>コース選択：</label>
+    <select id="courseSelect">
+      <option value="easy">初級コース</option>
+      <option value="medium">中級コース</option>
+      <option value="hard">上級コース</option>
+    </select>
+  </div>
+  <div>
+    <label>テーマ選択：</label>
+    <select id="themeSelect">
+      <option value="daily">日常英単語</option>
+      <option value="game">ゲーム用英単語</option>
+      <option value="business">ビジネス英単語</option>
+    </select>
+  </div>
+  <div>
+    <label>制限時間（秒）：</label>
+    <input type="number" id="timeInput" value="60" min="10" max="600">
+  </div>
+  <div>
+    <label>ゲームモード：</label>
+    <select id="modeSelect">
+      <option value="normal">ノーマルモード</option>
+      <option value="challenge">チャレンジモード</option>
+    </select>
+  </div>
+  <div id="description">
+    <p><strong>チャレンジモード:</strong> 10コンボごとに+5秒！</p>
+  </div>
+  <button id="startBtn">スタート準備</button>
 </div>
 
 <div id="gameArea">
   <div id="countdown"></div>
-  <div id="timer">60</div>
-  <div id="score">0</div>
-  <div id="word">...</div>
+  <div id="timer">残り時間:60</div>
+  <div id="score">スコア:0</div>
+  <div id="combo">コンボ:0</div>
+  <div id="level">コース:初級</div>
+  <div id="word">スペースでスタート</div>
   <input id="input" disabled>
 </div>
 
-<div id="resultArea">
+<div id="reviewArea">
   <h2>結果</h2>
-  <div class="stat" id="finalScore"></div>
-  <div class="stat" id="accuracy"></div>
-  <div class="stat" id="rank"></div>
+  <div id="finalScore"></div>
   <button onclick="location.reload()">もう一度</button>
 </div>
 
 <script>
-let words=["apple","banana","orange","grape","melon","peach"];
-let current="",score=0,time=60,correct=0,total=0;
-let interval;
+let wordBank = {
+  easy:{daily:["act","add","ask","use","win","run","go","play","see","eat"], game:["jump","level","boss","quest","coin","attack","defend","magic","score","item"], business:["meet","plan","call","task","note","deal","order","save","hire","report"]},
+  medium:{daily:["ability","accept","achieve","admit","affect","agree","allow","appear","apply","argue"], game:["upgrade","strategy","challenge","enemy","reward","skill","damage","puzzle","battle","team"], business:["develop","manage","improve","project","budget","report","market","invest","review","deliver"]},
+  hard:{daily:["establish","develop","discover","educate","improve","increase","influence","maintain","produce","understand"], game:["achievement","environment","competition","mechanics","technique","interface","experience","multiplayer","campaign"], business:["negotiation","corporation","innovation","entrepreneur","investment","leadership","consulting","acquisition","performance","management"]}
+};
 
-// 準備
-function prepareGame(){
+let currentWord="", score=0, combo=0, time=60;
+let timerRunning=false, intervalID, charIndex=0;
+let course="easy", theme="daily", mode="normal";
+
+// スタート準備
+document.getElementById("startBtn").onclick = function(){
+  course = document.getElementById("courseSelect").value;
+  theme = document.getElementById("themeSelect").value;
+  mode = document.getElementById("modeSelect").value;
+  time = parseInt(document.getElementById("timeInput").value) || 60;
+
   document.getElementById("setupArea").style.display="none";
   document.getElementById("gameArea").style.display="block";
-  startCountdown();
-}
+  document.getElementById("timer").textContent="残り時間:"+time;
+  document.getElementById("level").textContent="コース:"+document.getElementById("courseSelect").selectedOptions[0].text;
+};
 
-// カウントダウン（これが欲しかったやつ）
+// カウントダウン
 function startCountdown(){
   let c=3;
   let el=document.getElementById("countdown");
@@ -65,54 +113,65 @@ function startCountdown(){
   },1000);
 }
 
+// スペースで開始
+document.addEventListener("keydown", function(e){
+  if(!timerRunning && e.code==="Space" && document.getElementById("gameArea").style.display==="block"){
+    timerRunning=true;
+    startCountdown();
+  }
+});
+
 // ゲーム開始
 function startGame(){
   document.getElementById("input").disabled=false;
   document.getElementById("input").focus();
-  nextWord();
-
-  interval=setInterval(()=>{
-    time--;
-    document.getElementById("timer").textContent=time;
-    if(time<=0) endGame();
-  },1000);
+  newWord();
+  intervalID=setInterval(countdown,1000);
 }
 
 // 単語
-function nextWord(){
-  current=words[Math.floor(Math.random()*words.length)];
-  document.getElementById("word").textContent=current;
+function getWord(){
+  let list = wordBank[course][theme];
+  return list[Math.floor(Math.random()*list.length)];
+}
+
+function newWord(){
+  currentWord=getWord();
+  charIndex=0;
+  document.getElementById("word").textContent=currentWord;
   document.getElementById("input").value="";
 }
 
 // 入力
-document.getElementById("input").addEventListener("input",e=>{
+document.getElementById("input").addEventListener("input", function(e){
   let val=e.target.value;
-  total++;
-  if(val===current){
-    score++;
-    correct++;
-    nextWord();
+  if(val[charIndex] === currentWord[charIndex]){
+    charIndex++;
+    if(charIndex === currentWord.length){
+      score++;
+      combo++;
+      if(mode==="challenge" && combo%10===0) time+=5;
+      document.getElementById("score").textContent="スコア:"+score;
+      document.getElementById("combo").textContent="コンボ:"+combo;
+      newWord();
+    }
+  } else {
+    e.target.value = val.slice(0,charIndex);
+    combo=0;
+    document.getElementById("combo").textContent="コンボ:"+combo;
   }
-  document.getElementById("score").textContent=score;
 });
 
-// 終了
-function endGame(){
-  clearInterval(interval);
-  document.getElementById("gameArea").style.display="none";
-  document.getElementById("resultArea").style.display="block";
-
-  let acc=Math.round((correct/total)*100)||0;
-
-  let rank="C";
-  if(score>20) rank="B";
-  if(score>30) rank="A";
-  if(score>40) rank="S";
-
-  document.getElementById("finalScore").textContent="スコア: "+score;
-  document.getElementById("accuracy").textContent="正確率: "+acc+"%";
-  document.getElementById("rank").textContent="ランク: "+rank;
+// タイマー
+function countdown(){
+  time--;
+  document.getElementById("timer").textContent="残り時間:"+time;
+  if(time<=0){
+    clearInterval(intervalID);
+    document.getElementById("gameArea").style.display="none";
+    document.getElementById("reviewArea").style.display="block";
+    document.getElementById("finalScore").textContent="スコア:"+score;
+  }
 }
 </script>
 
