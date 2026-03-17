@@ -199,7 +199,7 @@ newInput.addEventListener("input", e => {
   let val = e.target.value;
 
   // 正解
-  if (val === current) {
+ if (val === currentWord) {
     score++;
     if (typeof combo !== "undefined") combo++;
 
@@ -219,7 +219,7 @@ newInput.addEventListener("input", e => {
   }
 
   // ミス
-  else if (current && !current.startsWith(val)) {
+else if (currentWord && !currentWord.startsWith(val)) {
     if (typeof combo !== "undefined") combo = 0;
 
     // 音
