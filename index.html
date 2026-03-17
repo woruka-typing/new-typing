@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>英単語タイピング 完全改良版</title>
+
 <style>
 body{ text-align:center; font-family:sans-serif; margin:0; padding:0; background-color:#f0f8ff;}
 h1{ font-size:60px; color:#333; margin-top:20px;}
@@ -16,176 +17,233 @@ button{ cursor:pointer;}
 #description{ font-size:24px; color:#555; margin:10px;}
 #countdown{ font-size:80px; color:red; }
 
+/* 🔥 縦配置（ここが修正ポイント） */
+#setupArea {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+#setupArea > div {
+  margin:10px 0;
+}
+#setupArea label {
+  display:block;
+  font-size:24px;
+}
+#setupArea select,
+#setupArea input {
+  width:250px;
+}
+
+/* スタートボタン強化 */
+#startBtn {
+  width:300px;
+  background:#007acc;
+  color:white;
+}
+
 .shake {
   animation: shake 0.2s;
 }
 @keyframes shake {
-  0% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  50% { transform: translateX(5px); }
-  75% { transform: translateX(-5px); }
-  100% { transform: translateX(0); }
+  0%{transform:translateX(0);}
+  25%{transform:translateX(-5px);}
+  50%{transform:translateX(5px);}
+  75%{transform:translateX(-5px);}
+  100%{transform:translateX(0);}
 }
 </style>
 </head>
+
 <body>
 
 <h1>英単語タイピング</h1>
 
 <div id="setupArea">
-<select id="courseSelect">
-<option value="easy">初級コース</option>
-<option value="medium">中級コース</option>
-<option value="hard">上級コース</option>
-</select>
+  <div>
+    <label>コース選択</label>
+    <select id="courseSelect">
+      <option value="easy">初級</option>
+      <option value="medium">中級</option>
+      <option value="hard">上級</option>
+    </select>
+  </div>
 
-<select id="themeSelect">
-<option value="daily">日常</option>
-<option value="game">ゲーム</option>
-<option value="business">ビジネス</option>
-</select>
+  <div>
+    <label>テーマ</label>
+    <select id="themeSelect">
+      <option value="daily">日常</option>
+      <option value="game">ゲーム</option>
+      <option value="business">ビジネス</option>
+    </select>
+  </div>
 
-<input type="number" id="timeInput" value="60">
+  <div>
+    <label>時間（秒）</label>
+    <input type="number" id="timeInput" value="60">
+  </div>
 
-<select id="modeSelect">
-<option value="normal">ノーマル</option>
-<option value="challenge">チャレンジ</option>
-</select>
+  <div>
+    <label>モード</label>
+    <select id="modeSelect">
+      <option value="normal">ノーマル</option>
+      <option value="challenge">チャレンジ</option>
+    </select>
+  </div>
 
-<button id="startBtn">スタート準備</button>
+  <button id="startBtn">スタート準備</button>
 </div>
 
 <div id="gameArea">
-<div id="countdown"></div>
-<div id="timer">残り時間:60</div>
-<div id="score">スコア:0</div>
-<div id="combo">コンボ:0</div>
-<div id="word">スペースでスタート</div>
-<input id="input" disabled>
+  <div id="countdown"></div>
+  <div id="timer">残り時間:60</div>
+  <div id="score">スコア:0</div>
+  <div id="combo">コンボ:0</div>
+  <div id="level"></div>
+  <div id="word">スペースでスタート</div>
+  <input id="input" disabled>
 </div>
 
 <div id="reviewArea">
-<h2>結果</h2>
-<div id="finalScore"></div>
-<button onclick="location.reload()">もう一度</button>
+  <h2>結果</h2>
+  <div id="finalScore"></div>
+
+  <button onclick="shareX()">Xでシェア</button>
+  <button onclick="shareLine()">LINEでシェア</button>
+
+  <br><br>
+  <button onclick="location.reload()">もう一度</button>
 </div>
 
 <script>
 let wordBank={
-easy:{daily:["act","add","ask","use"],game:["jump","boss"],business:["meet","plan"]},
-medium:{daily:["accept","achieve"],game:["strategy","battle"],business:["manage","project"]},
-hard:{daily:["develop","increase"],game:["environment","experience"],business:["investment","performance"]}
+ easy:{daily:["act","add","ask","use","win"],game:["jump","boss","coin"],business:["meet","plan","task"]},
+ medium:{daily:["accept","achieve","allow"],game:["strategy","battle"],business:["project","market"]},
+ hard:{daily:["establish","improve"],game:["competition"],business:["investment"]}
 };
 
 let currentWord="",score=0,combo=0,time=60;
-let intervalID,charIndex=0;
-let course="easy",theme="daily",mode="normal";
+let timerRunning=false,intervalID;
+let course,theme,mode;
 
-// 音
 const okSound=new Audio("https://www.soundjay.com/button/sounds/button-4.mp3");
 const missSound=new Audio("https://www.soundjay.com/button/sounds/button-10.mp3");
 
-document.getElementById("startBtn").onclick=function(){
-course=document.getElementById("courseSelect").value;
-theme=document.getElementById("themeSelect").value;
-mode=document.getElementById("modeSelect").value;
-time=parseInt(document.getElementById("timeInput").value)||60;
+document.getElementById("startBtn").onclick=()=>{
+ course=document.getElementById("courseSelect").value;
+ theme=document.getElementById("themeSelect").value;
+ mode=document.getElementById("modeSelect").value;
+ time=parseInt(document.getElementById("timeInput").value)||60;
 
-document.getElementById("setupArea").style.display="none";
-document.getElementById("gameArea").style.display="block";
-document.getElementById("timer").textContent="残り時間:"+time;
+ document.getElementById("setupArea").style.display="none";
+ document.getElementById("gameArea").style.display="block";
+ document.getElementById("timer").textContent="残り時間:"+time;
 };
 
-function startCountdown(){
-let c=3;
-let el=document.getElementById("countdown");
-let t=setInterval(()=>{
-el.textContent=c>0?c:"GO!";
-c--;
-if(c<-1){
-clearInterval(t);
-el.textContent="";
-startGame();
-}
-},1000);
-}
-
 document.addEventListener("keydown",e=>{
-if(e.code==="Space") startCountdown();
+ if(!timerRunning && e.code==="Space"){
+  timerRunning=true;
+  startCountdown();
+ }
 });
 
+function startCountdown(){
+ let c=3;
+ let el=document.getElementById("countdown");
+ let t=setInterval(()=>{
+  el.textContent=c>0?c:"GO!";
+  c--;
+  if(c<-1){
+   clearInterval(t);
+   el.textContent="";
+   startGame();
+  }
+ },1000);
+}
+
 function startGame(){
-document.getElementById("input").disabled=false;
-document.getElementById("input").focus();
-newWord();
-intervalID=setInterval(countdown,1000);
+ document.getElementById("input").disabled=false;
+ document.getElementById("input").focus();
+ newWord();
+ intervalID=setInterval(countdown,1000);
 }
 
 function getWord(){
-let list=wordBank[course][theme];
-return list[Math.floor(Math.random()*list.length)];
+ let list=wordBank[course][theme];
+ return list[Math.floor(Math.random()*list.length)];
 }
 
 function newWord(){
-currentWord=getWord();
-charIndex=0;
-document.getElementById("word").textContent=currentWord;
-document.getElementById("input").value="";
+ currentWord=getWord();
+ document.getElementById("word").textContent=currentWord;
+ document.getElementById("input").value="";
 }
 
-// ★ここが完全版（ベネッセ）
-document.getElementById("input").addEventListener("input",function(e){
-let val=e.target.value;
-let wordEl=document.getElementById("word");
+document.getElementById("input").addEventListener("input",e=>{
+ let val=e.target.value;
+ let wordEl=document.getElementById("word");
 
-// 正しい入力だけ許可
-if(currentWord.startsWith(val)){
+ if(currentWord.startsWith(val)){
+  okSound.currentTime=0; okSound.play();
 
-okSound.currentTime=0;
-okSound.play();
+  if(val===currentWord){
+   score++; combo++;
 
-charIndex=val.length;
+   if(mode==="challenge" && combo%10===0) time+=5;
 
-if(val===currentWord){
-score++;
-combo++;
+   if(combo>=10) wordEl.style.color="gold";
+   else if(combo>=5) wordEl.style.color="orange";
+   else wordEl.style.color="#007acc";
 
-if(mode==="challenge" && combo%10===0) time+=5;
+   document.getElementById("score").textContent="スコア:"+score;
+   document.getElementById("combo").textContent="コンボ:"+combo;
 
-if(combo>=10) wordEl.style.color="gold";
-else if(combo>=5) wordEl.style.color="orange";
-else wordEl.style.color="#007acc";
+   newWord();
+  }
 
-document.getElementById("score").textContent="スコア:"+score;
-document.getElementById("combo").textContent="コンボ:"+combo;
+ }else{
+  e.target.value=val.slice(0,-1);
+  combo=0;
 
-newWord();
-}
+  missSound.currentTime=0; missSound.play();
 
-}else{
-// ミス → 戻す
-e.target.value=val.slice(0,-1);
-combo=0;
+  wordEl.classList.add("shake");
+  setTimeout(()=>wordEl.classList.remove("shake"),200);
 
-missSound.currentTime=0;
-missSound.play();
-
-wordEl.classList.add("shake");
-setTimeout(()=>wordEl.classList.remove("shake"),200);
-
-document.getElementById("combo").textContent="コンボ:"+combo;
-}
+  document.getElementById("combo").textContent="コンボ:"+combo;
+ }
 });
 
 function countdown(){
-time--;
-document.getElementById("timer").textContent="残り時間:"+time;
-if(time<=0){
-clearInterval(intervalID);
-document.getElementById("gameArea").style.display="none";
-document.getElementById("reviewArea").style.display="block";
-document.getElementById("finalScore").textContent="スコア:"+score;
+ time--;
+ document.getElementById("timer").textContent="残り時間:"+time;
+
+ if(time<=0){
+  clearInterval(intervalID);
+  document.getElementById("gameArea").style.display="none";
+  document.getElementById("reviewArea").style.display="block";
+
+  let rank="C";
+  if(score>10) rank="B";
+  if(score>20) rank="A";
+  if(score>30) rank="S";
+
+  let msg=`お前 ${rank}ランク`;
+  if(rank==="A") msg+="。あと少しでS";
+  if(rank==="S") msg+="。バケモン";
+
+  document.getElementById("finalScore").textContent=msg+"（"+score+"点）";
+ }
 }
+
+function shareX(){
+ let text=encodeURIComponent(`英単語タイピングで${score}点。お前は？`);
+ window.open(`https://twitter.com/intent/tweet?text=${text}`);
+}
+
+function shareLine(){
+ let text=encodeURIComponent(`英単語タイピングで${score}点。お前は？`);
+ window.open(`https://social-plugins.line.me/lineit/share?text=${text}`);
 }
 </script>
 
