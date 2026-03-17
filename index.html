@@ -18,7 +18,16 @@ button{ cursor:pointer;}
 #shareBtns button{ margin:5px; font-size:22px; padding:8px 15px;}
 #description{ font-size:24px; color:#555; margin:10px;}
 #countdown{ font-size:80px; color:red; }
-</style>
+.shake {
+  animation: shake 0.2s;
+}
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}</style>
 </head>
 <body>
 
@@ -173,7 +182,63 @@ function countdown(){
     document.getElementById("finalScore").textContent="スコア:"+score;
   }
 }
-</script>
+// ===== 追加：音 =====
+const okSound = new Audio("https://www.soundjay.com/button/sounds/button-4.mp3");
+const missSound = new Audio("https://www.soundjay.com/button/sounds/button-10.mp3");
+
+// ===== 既存のinput処理を上書き =====
+const inputEl = document.getElementById("input");
+const wordEl = document.getElementById("word");
+
+// いったん全部イベント消す（これで壊れない）
+const newInput = inputEl.cloneNode(true);
+inputEl.parentNode.replaceChild(newInput, inputEl);
+
+// 新しい処理
+newInput.addEventListener("input", e => {
+  let val = e.target.value;
+
+  // 正解
+  if (val === current) {
+    score++;
+    if (typeof combo !== "undefined") combo++;
+
+    // 音
+    okSound.currentTime = 0;
+    okSound.play();
+
+    // 文字色変化（benesse風）
+    if (typeof combo !== "undefined") {
+      if (combo >= 10) wordEl.style.color = "gold";
+      else if (combo >= 5) wordEl.style.color = "orange";
+      else wordEl.style.color = "#007acc";
+    }
+
+    if (typeof nextWord === "function") nextWord();
+    else if (typeof newWord === "function") newWord();
+  }
+
+  // ミス
+  else if (current && !current.startsWith(val)) {
+    if (typeof combo !== "undefined") combo = 0;
+
+    // 音
+    missSound.currentTime = 0;
+    missSound.play();
+
+    // 揺れ
+    wordEl.classList.add("shake");
+    setTimeout(() => wordEl.classList.remove("shake"), 200);
+  }
+
+  // 表示更新
+  if (document.getElementById("score")) {
+    document.getElementById("score").textContent = score;
+  }
+  if (document.getElementById("combo")) {
+    document.getElementById("combo").textContent = combo;
+  }
+});</script>
 
 </body>
 </html>
